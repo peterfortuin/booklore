@@ -204,6 +204,7 @@ export class AppMenuComponent implements OnInit {
           menu: this.libraryShelfMenuService.initializeShelfMenuItems(shelf),
           label: shelf.name,
           type: 'Shelf',
+          shelfId: shelf.id,
           icon: shelf.icon || undefined,
           iconType: (shelf.iconType || undefined) as 'PRIME_NG' | 'CUSTOM_SVG' | undefined,
           routerLink: [`/shelf/${shelf.id}/books`],

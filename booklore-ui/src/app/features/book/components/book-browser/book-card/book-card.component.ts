@@ -280,6 +280,12 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
     this.cdr.markForCheck();
   }
 
+  onDragStart(event: DragEvent): void {
+    if (this.book?.id != null) {
+      event.dataTransfer?.setData('bookId', this.book.id.toString());
+    }
+  }
+
   readBook(book: Book): void {
     if (this.forceEbookMode && book.primaryFile?.bookType === 'AUDIOBOOK') {
       const ebookType = this.getEbookType(book);

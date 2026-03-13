@@ -13,9 +13,11 @@ import {DialogLauncherService} from '../../../services/dialog-launcher.service';
 import {BookDialogHelperService} from '../../../../features/book/components/book-browser/book-dialog-helper.service';
 import {IconDisplayComponent} from '../../../components/icon-display/icon-display.component';
 import {Tooltip} from 'primeng/tooltip';
-import {MenuItem} from 'primeng/api';
+import {MenuItem, MessageService} from 'primeng/api';
 import {IconSelection} from '../../../service/icon-picker.service';
-import {TranslocoPipe} from '@jsverse/transloco';
+import {TranslocoPipe, TranslocoService} from '@jsverse/transloco';
+import {BookPatchService} from '../../../../features/book/service/book-patch.service';
+import {ShelfService} from '../../../../features/book/service/shelf.service';
 
 @Component({
   selector: '[app-menuitem]',
@@ -58,6 +60,7 @@ export class AppMenuitemComponent implements OnInit, OnDestroy {
   canManipulateLibrary: boolean = false;
   admin: boolean = false;
   expandedItems = new Set<string>();
+  isDragOver = false;
 
   get isRouteActive(): boolean {
     if (!this.item?.routerLink?.[0]) return false;
@@ -74,7 +77,11 @@ export class AppMenuitemComponent implements OnInit, OnDestroy {
     private menuService: MenuService,
     private userService: UserService,
     private dialogLauncher: DialogLauncherService,
-    private bookDialogHelperService: BookDialogHelperService
+    private bookDialogHelperService: BookDialogHelperService,
+    private bookPatchService: BookPatchService,
+    private messageService: MessageService,
+    private shelfService: ShelfService,
+    private t: TranslocoService
   ) {
     this.userStateSubscription = this.userService.userState$.subscribe(userState => {
       if (userState?.user) {
@@ -194,6 +201,48 @@ export class AppMenuitemComponent implements OnInit, OnDestroy {
       type: this.item.iconType || 'PRIME_NG',
       value: this.item.icon
     };
+  }
+
+  onDragOver(event: DragEvent): void {
+    if (this.item?.shelfId != null && event.dataTransfer?.types.includes('bookid')) {
+      event.preventDefault();
+      this.isDragOver = true;
+    }
+  }
+
+  onDragLeave(event: DragEvent): void {
+    this.isDragOver = false;
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.isDragOver = false;
+    const bookIdStr = event.dataTransfer?.getData('bookId');
+    const bookId = bookIdStr ? parseInt(bookIdStr, 10) : NaN;
+    if (isNaN(bookId) || this.item?.shelfId == null) {
+      return;
+    }
+    this.bookPatchService.updateBookShelves(
+      new Set([bookId]),
+      new Set([this.item.shelfId]),
+      new Set()
+    ).subscribe({
+      next: () => {
+        this.shelfService.reloadShelves();
+        this.messageService.add({
+          severity: 'success',
+          summary: this.t.translate('shared.shelf.dragDrop.success.summary'),
+          detail: this.t.translate('shared.shelf.dragDrop.success.detail', {shelf: this.item.label}),
+        });
+      },
+      error: () => {
+        this.messageService.add({
+          severity: 'error',
+          summary: this.t.translate('shared.shelf.dragDrop.error.summary'),
+          detail: this.t.translate('shared.shelf.dragDrop.error.detail'),
+        });
+      }
+    });
   }
 
 }

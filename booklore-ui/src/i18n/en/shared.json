@@ -162,5 +162,17 @@
     "toast": {
       "createFailedDefault": "Failed to create admin user. Try again."
     }
+  },
+  "shelf": {
+    "dragDrop": {
+      "success": {
+        "summary": "Book Added to Shelf",
+        "detail": "The book was successfully added to \"{{ shelf }}\""
+      },
+      "error": {
+        "summary": "Failed to Add Book",
+        "detail": "An error occurred while adding the book to the shelf."
+      }
+    }
   }
 }

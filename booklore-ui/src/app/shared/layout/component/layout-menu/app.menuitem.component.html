@@ -32,7 +32,11 @@
     <div
       class="menu-item-container"
       [class.active-route-container]="isRouteActive"
+      [class.drag-over]="isDragOver"
       (click)="triggerLink()"
+      (dragover)="onDragOver($event)"
+      (dragleave)="onDragLeave($event)"
+      (drop)="onDrop($event)"
     >
       @if ((item.routerLink && !item.items)) {
         <a
