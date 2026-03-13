@@ -81,7 +81,7 @@ export class AppMenuitemComponent implements OnInit, OnDestroy {
     private bookPatchService: BookPatchService,
     private messageService: MessageService,
     private shelfService: ShelfService,
-    private t: TranslocoService
+    private translocoService: TranslocoService
   ) {
     this.userStateSubscription = this.userService.userState$.subscribe(userState => {
       if (userState?.user) {
@@ -239,15 +239,15 @@ export class AppMenuitemComponent implements OnInit, OnDestroy {
         this.shelfService.reloadShelves();
         this.messageService.add({
           severity: 'success',
-          summary: this.t.translate('shared.shelf.dragDrop.success.summary'),
-          detail: this.t.translate('shared.shelf.dragDrop.success.detail', {shelf: this.item.label}),
+          summary: this.translocoService.translate('shared.shelf.dragDrop.success.summary'),
+          detail: this.translocoService.translate('shared.shelf.dragDrop.success.detail', {shelf: this.item.label}),
         });
       },
       error: () => {
         this.messageService.add({
           severity: 'error',
-          summary: this.t.translate('shared.shelf.dragDrop.error.summary'),
-          detail: this.t.translate('shared.shelf.dragDrop.error.detail'),
+          summary: this.translocoService.translate('shared.shelf.dragDrop.error.summary'),
+          detail: this.translocoService.translate('shared.shelf.dragDrop.error.detail'),
         });
       }
     });
