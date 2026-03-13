@@ -33,6 +33,8 @@
       class="menu-item-container"
       [class.active-route-container]="isRouteActive"
       [class.drag-over]="isDragOver"
+      [attr.data-shelf-id]="item.shelfId ?? null"
+      [attr.data-shelf-label]="item.shelfId != null ? item.label : null"
       (click)="triggerLink()"
       (dragover)="onDragOver($event)"
       (dragleave)="onDragLeave($event)"

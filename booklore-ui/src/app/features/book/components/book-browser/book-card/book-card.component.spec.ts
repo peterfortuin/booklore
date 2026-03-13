@@ -16,8 +16,9 @@ import {BookNavigationService} from '../../../service/book-navigation.service';
 import {AppSettingsService} from '../../../../../shared/service/app-settings.service';
 import {TranslocoService} from '@jsverse/transloco';
 import {ReadStatusHelper} from '../../../helpers/read-status.helper';
-import {of, Subject} from 'rxjs';
+import {of} from 'rxjs';
 import {Book} from '../../../model/book.model';
+import {BookDragService} from '../book-drag.service';
 
 function createDragEvent(types: string[], getData: (key: string) => string = () => ''): DragEvent {
   const dataMap = new Map<string, string>();
@@ -30,50 +31,78 @@ function createDragEvent(types: string[], getData: (key: string) => string = () 
   return {dataTransfer: dt, preventDefault: vi.fn()} as unknown as DragEvent;
 }
 
+function createTouchEvent(clientX: number, clientY: number, type: 'touchstart' | 'touchmove' | 'touchend'): TouchEvent {
+  const touch = {clientX, clientY} as Touch;
+  return {
+    touches: type !== 'touchend' ? [touch] : [],
+    changedTouches: [touch],
+    preventDefault: vi.fn(),
+  } as unknown as TouchEvent;
+}
+
+function mockElementFromPoint(element: Element | null): void {
+  Object.defineProperty(document, 'elementFromPoint', {
+    value: vi.fn(() => element),
+    writable: true,
+    configurable: true,
+  });
+}
+
+function makeProviders(mockDragService: any) {
+  return [
+    BookSelectionService,
+    {provide: BookDragService, useValue: mockDragService},
+    {provide: BookService, useValue: {bookState$: of({loaded: false, books: []})}},
+    {provide: BookFileService, useValue: {}},
+    {provide: BookMetadataManageService, useValue: {}},
+    {provide: TaskHelperService, useValue: {}},
+    {provide: UserService, useValue: {userState$: of(null)}},
+    {provide: EmailService, useValue: {}},
+    {provide: MessageService, useValue: {add: vi.fn()}},
+    {provide: Router, useValue: {navigate: vi.fn(), events: of(), url: '/', isActive: vi.fn(() => false)}},
+    {provide: UrlHelperService, useValue: {getThumbnailUrl: vi.fn(() => ''), getAudiobookThumbnailUrl: vi.fn(() => '')}},
+    {provide: ConfirmationService, useValue: {}},
+    {provide: BookDialogHelperService, useValue: {}},
+    {provide: BookNavigationService, useValue: {}},
+    {provide: AppSettingsService, useValue: {appSettings$: of(null)}},
+    {
+      provide: TranslocoService, useValue: {
+        translate: vi.fn((key: string) => key),
+        selectTranslation: vi.fn(() => of({})),
+        langChanges$: of('en'),
+      }
+    },
+    {
+      provide: ReadStatusHelper, useValue: {
+        getReadStatusIcon: vi.fn(() => ''),
+        getReadStatusClass: vi.fn(() => ''),
+        getReadStatusTooltip: vi.fn(() => ''),
+        shouldShowStatusIcon: vi.fn(() => false),
+      }
+    },
+  ];
+}
+
+const mockBook: Partial<Book> = {
+  id: 42,
+  metadata: {title: 'Test Book'} as any,
+  readStatus: 'UNREAD' as any,
+};
+
 describe('BookCardComponent – onDragStart', () => {
   let component: BookCardComponent;
   let bookSelectionService: BookSelectionService;
-
-  const mockBook: Partial<Book> = {
-    id: 42,
-    metadata: {title: 'Test Book'} as any,
-    readStatus: 'UNREAD' as any,
-  };
+  let mockDragService: {startDrag: ReturnType<typeof vi.fn>; endDrag: ReturnType<typeof vi.fn>; dropOnShelf: ReturnType<typeof vi.fn>; draggedBookIds: number[]};
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      providers: [
-        BookSelectionService,
-        {provide: BookService, useValue: {bookState$: of({loaded: false, books: []})}},
-        {provide: BookFileService, useValue: {}},
-        {provide: BookMetadataManageService, useValue: {}},
-        {provide: TaskHelperService, useValue: {}},
-        {provide: UserService, useValue: {userState$: of(null)}},
-        {provide: EmailService, useValue: {}},
-        {provide: MessageService, useValue: {add: vi.fn()}},
-        {provide: Router, useValue: {navigate: vi.fn(), events: of(), url: '/', isActive: vi.fn(() => false)}},
-        {provide: UrlHelperService, useValue: {getThumbnailUrl: vi.fn(() => ''), getAudiobookThumbnailUrl: vi.fn(() => '')}},
-        {provide: ConfirmationService, useValue: {}},
-        {provide: BookDialogHelperService, useValue: {}},
-        {provide: BookNavigationService, useValue: {}},
-        {provide: AppSettingsService, useValue: {appSettings$: of(null)}},
-        {
-          provide: TranslocoService, useValue: {
-            translate: vi.fn((key: string) => key),
-            selectTranslation: vi.fn(() => of({})),
-            langChanges$: of('en'),
-          }
-        },
-        {
-          provide: ReadStatusHelper, useValue: {
-            getReadStatusIcon: vi.fn(() => ''),
-            getReadStatusClass: vi.fn(() => ''),
-            getReadStatusTooltip: vi.fn(() => ''),
-            shouldShowStatusIcon: vi.fn(() => false),
-          }
-        },
-      ]
-    });
+    mockDragService = {
+      startDrag: vi.fn(),
+      endDrag: vi.fn(),
+      dropOnShelf: vi.fn(),
+      draggedBookIds: [],
+    };
+
+    TestBed.configureTestingModule({providers: makeProviders(mockDragService)});
 
     const fixture = TestBed.createComponent(BookCardComponent);
     component = fixture.componentInstance;
@@ -125,4 +154,138 @@ describe('BookCardComponent – onDragStart', () => {
     component.onDragStart(event);
     expect(event.dataTransfer!.setData).toHaveBeenCalledWith('bookIds', JSON.stringify([42]));
   });
+
+  it('should also call bookDragService.startDrag on drag start', () => {
+    component.isSelected = false;
+    const event = createDragEvent([]);
+    component.onDragStart(event);
+    expect(mockDragService.startDrag).toHaveBeenCalledWith([42]);
+  });
 });
+
+describe('BookCardComponent – touch drag-and-drop', () => {
+  let component: BookCardComponent;
+  let bookSelectionService: BookSelectionService;
+  let mockDragService: {startDrag: ReturnType<typeof vi.fn>; endDrag: ReturnType<typeof vi.fn>; dropOnShelf: ReturnType<typeof vi.fn>; draggedBookIds: number[]};
+
+  beforeEach(() => {
+    mockDragService = {
+      startDrag: vi.fn(),
+      endDrag: vi.fn(),
+      dropOnShelf: vi.fn(),
+      draggedBookIds: [],
+    };
+
+    TestBed.configureTestingModule({providers: makeProviders(mockDragService)});
+
+    const fixture = TestBed.createComponent(BookCardComponent);
+    component = fixture.componentInstance;
+    bookSelectionService = TestBed.inject(BookSelectionService);
+
+    component.book = mockBook as Book;
+    component.isSelected = false;
+    component.index = 0;
+  });
+
+  // ─── onTouchStart ─────────────────────────────────────────────────────────
+
+  it('should not call startDrag when book id is null', () => {
+    component.book = {...mockBook, id: undefined} as any;
+    component.onTouchStart(createTouchEvent(0, 0, 'touchstart'));
+    expect(mockDragService.startDrag).not.toHaveBeenCalled();
+  });
+
+  it('should call startDrag with the single book id when not selected', () => {
+    component.isSelected = false;
+    component.onTouchStart(createTouchEvent(0, 0, 'touchstart'));
+    expect(mockDragService.startDrag).toHaveBeenCalledWith([42]);
+  });
+
+  it('should call startDrag with all selected ids when selection has multiple books', () => {
+    bookSelectionService.setSelectedBooks(new Set([42, 7, 99]));
+    component.isSelected = true;
+    component.onTouchStart(createTouchEvent(0, 0, 'touchstart'));
+    const ids: number[] = mockDragService.startDrag.mock.calls[0][0];
+    expect(ids.sort((a, b) => a - b)).toEqual([7, 42, 99]);
+  });
+
+  // ─── onTouchMove ─────────────────────────────────────────────────────────
+
+  it('should do nothing on touchmove when no drag is active', () => {
+    mockDragService.draggedBookIds = [];
+    const event = createTouchEvent(0, 0, 'touchmove');
+    component.onTouchMove(event);
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('should call preventDefault on touchmove when drag is active', () => {
+    mockDragService.draggedBookIds = [42];
+    const container = document.createElement('div');
+    container.classList.add('menu-item-container');
+    container.dataset['shelfId'] = '10';
+    mockElementFromPoint(container);
+
+    const event = createTouchEvent(100, 100, 'touchmove');
+    component.onTouchMove(event);
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it('should add drag-over class to shelf container under finger during touchmove', () => {
+    mockDragService.draggedBookIds = [42];
+    const container = document.createElement('div');
+    container.classList.add('menu-item-container');
+    container.dataset['shelfId'] = '10';
+    mockElementFromPoint(container);
+
+    component.onTouchMove(createTouchEvent(100, 100, 'touchmove'));
+    expect(container.classList.contains('drag-over')).toBe(true);
+  });
+
+  // ─── onTouchEnd ──────────────────────────────────────────────────────────
+
+  it('should do nothing on touchend when no drag is active', () => {
+    mockDragService.draggedBookIds = [];
+    const event = createTouchEvent(0, 0, 'touchend');
+    component.onTouchEnd(event);
+    expect(mockDragService.dropOnShelf).not.toHaveBeenCalled();
+    expect(mockDragService.endDrag).not.toHaveBeenCalled();
+  });
+
+  it('should call dropOnShelf when finger lifts over a shelf container', () => {
+    mockDragService.draggedBookIds = [42];
+    const container = document.createElement('div');
+    container.classList.add('menu-item-container');
+    container.dataset['shelfId'] = '10';
+    container.dataset['shelfLabel'] = 'My Shelf';
+    mockElementFromPoint(container);
+
+    component.onTouchEnd(createTouchEvent(100, 100, 'touchend'));
+    expect(mockDragService.dropOnShelf).toHaveBeenCalledWith(10, 'My Shelf');
+  });
+
+  it('should call endDrag when finger lifts over a non-shelf element', () => {
+    mockDragService.draggedBookIds = [42];
+    const div = document.createElement('div');
+    mockElementFromPoint(div);
+
+    component.onTouchEnd(createTouchEvent(0, 0, 'touchend'));
+    expect(mockDragService.dropOnShelf).not.toHaveBeenCalled();
+    expect(mockDragService.endDrag).toHaveBeenCalled();
+  });
+
+  it('should remove drag-over class from previous target on touchend', () => {
+    mockDragService.draggedBookIds = [42];
+    const container = document.createElement('div');
+    container.classList.add('menu-item-container', 'drag-over');
+    container.dataset['shelfId'] = '10';
+    container.dataset['shelfLabel'] = 'My Shelf';
+    mockElementFromPoint(container);
+
+    // simulate a previous touch-move target
+    (component as any)._touchDragTarget = container;
+
+    component.onTouchEnd(createTouchEvent(100, 100, 'touchend'));
+    expect(container.classList.contains('drag-over')).toBe(false);
+  });
+});
+

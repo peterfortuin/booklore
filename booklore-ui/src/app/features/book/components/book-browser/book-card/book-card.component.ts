@@ -30,6 +30,7 @@ import {BookCardOverlayPreferenceService} from '../book-card-overlay-preference.
 import {AppSettingsService} from '../../../../../shared/service/app-settings.service';
 import {TranslocoPipe, TranslocoService} from '@jsverse/transloco';
 import {BookSelectionService} from '../book-selection.service';
+import {BookDragService} from '../book-drag.service';
 
 @Component({
   selector: 'app-book-card',
@@ -80,6 +81,9 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
   private appSettingsService = inject(AppSettingsService);
   private readonly t = inject(TranslocoService);
   private bookSelectionService = inject(BookSelectionService);
+  private bookDragService = inject(BookDragService);
+
+  private _touchDragTarget: HTMLElement | null = null;
 
   protected _progressPercentage: number | null = null;
   protected _koProgressPercentage: number | null = null;
@@ -291,6 +295,60 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
       ? Array.from(selected)
       : [this.book.id];
     event.dataTransfer?.setData('bookIds', JSON.stringify(bookIds));
+    this.bookDragService.startDrag(bookIds);
+  }
+
+  onTouchStart(event: TouchEvent): void {
+    if (this.book?.id == null) {
+      return;
+    }
+    const selected = this.bookSelectionService.selectedBooks;
+    const bookIds = this.isSelected && selected.size > 1
+      ? Array.from(selected)
+      : [this.book.id];
+    this.bookDragService.startDrag(bookIds);
+  }
+
+  onTouchMove(event: TouchEvent): void {
+    if (this.bookDragService.draggedBookIds.length === 0) {
+      return;
+    }
+    event.preventDefault();
+
+    const touch = event.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const container = target?.closest('.menu-item-container[data-shelf-id]') as HTMLElement | null;
+
+    if (container !== this._touchDragTarget) {
+      this._touchDragTarget?.classList.remove('drag-over');
+      this._touchDragTarget = container;
+      container?.classList.add('drag-over');
+    }
+  }
+
+  onTouchEnd(event: TouchEvent): void {
+    if (this.bookDragService.draggedBookIds.length === 0) {
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const container = target?.closest('.menu-item-container[data-shelf-id]') as HTMLElement | null;
+
+    this._touchDragTarget?.classList.remove('drag-over');
+    this._touchDragTarget = null;
+
+    if (container) {
+      const shelfId = parseInt(container.dataset['shelfId'] ?? '', 10);
+      if (isNaN(shelfId)) {
+        this.bookDragService.endDrag();
+        return;
+      }
+      const shelfLabel = container.dataset['shelfLabel'] ?? '';
+      this.bookDragService.dropOnShelf(shelfId, shelfLabel);
+    } else {
+      this.bookDragService.endDrag();
+    }
   }
 
   readBook(book: Book): void {
