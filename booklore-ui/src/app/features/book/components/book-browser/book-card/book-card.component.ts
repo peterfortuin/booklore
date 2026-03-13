@@ -29,6 +29,7 @@ import {BookNavigationService} from '../../../service/book-navigation.service';
 import {BookCardOverlayPreferenceService} from '../book-card-overlay-preference.service';
 import {AppSettingsService} from '../../../../../shared/service/app-settings.service';
 import {TranslocoPipe, TranslocoService} from '@jsverse/transloco';
+import {BookSelectionService} from '../book-selection.service';
 
 @Component({
   selector: 'app-book-card',
@@ -78,6 +79,7 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
   private cdr = inject(ChangeDetectorRef);
   private appSettingsService = inject(AppSettingsService);
   private readonly t = inject(TranslocoService);
+  private bookSelectionService = inject(BookSelectionService);
 
   protected _progressPercentage: number | null = null;
   protected _koProgressPercentage: number | null = null;
@@ -281,9 +283,14 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   onDragStart(event: DragEvent): void {
-    if (this.book?.id != null) {
-      event.dataTransfer?.setData('bookId', this.book.id.toString());
+    if (this.book?.id == null) {
+      return;
     }
+    const selected = this.bookSelectionService.selectedBooks;
+    const bookIds = this.isSelected && selected.size > 1
+      ? Array.from(selected)
+      : [this.book.id];
+    event.dataTransfer?.setData('bookIds', JSON.stringify(bookIds));
   }
 
   readBook(book: Book): void {

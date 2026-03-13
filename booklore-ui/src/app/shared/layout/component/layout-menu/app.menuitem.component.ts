@@ -204,7 +204,7 @@ export class AppMenuitemComponent implements OnInit, OnDestroy {
   }
 
   onDragOver(event: DragEvent): void {
-    if (this.item?.shelfId != null && event.dataTransfer?.types.includes('bookid')) {
+    if (this.item?.shelfId != null && event.dataTransfer?.types.includes('bookids')) {
       event.preventDefault();
       this.isDragOver = true;
     }
@@ -216,14 +216,22 @@ export class AppMenuitemComponent implements OnInit, OnDestroy {
 
   onDrop(event: DragEvent): void {
     event.preventDefault();
+
     this.isDragOver = false;
-    const bookIdStr = event.dataTransfer?.getData('bookId');
-    const bookId = bookIdStr ? parseInt(bookIdStr, 10) : NaN;
-    if (isNaN(bookId) || this.item?.shelfId == null) {
+
+    if (this.item?.shelfId == null) {
       return;
     }
+
+    const raw = event.dataTransfer?.getData('bookIds');
+    const bookIds: number[] = raw ? JSON.parse(raw) : [];
+
+    if (bookIds.length === 0) {
+      return;
+    }
+
     this.bookPatchService.updateBookShelves(
-      new Set([bookId]),
+      new Set(bookIds),
       new Set([this.item.shelfId]),
       new Set()
     ).subscribe({
