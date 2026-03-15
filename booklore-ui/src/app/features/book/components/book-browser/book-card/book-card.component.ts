@@ -306,27 +306,27 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
     }
 
     const coverImg = (event.currentTarget as HTMLElement)?.querySelector<HTMLImageElement>('.book-cover');
+    const coverW = coverImg?.clientWidth || this.GHOST_COVER_W;
+    const coverH = coverImg?.clientHeight || this.GHOST_COVER_H;
     if (bookIds.length === 1) {
       if (coverImg) {
-        const w = coverImg.clientWidth || this.GHOST_COVER_W;
-        const h = coverImg.clientHeight || this.GHOST_COVER_H;
-        event.dataTransfer.setDragImage(coverImg, w / 2, h / 2);
+        event.dataTransfer.setDragImage(coverImg, coverW / 2, coverH / 2);
       }
     } else {
-      const ghost = this.createMultiBookGhost(bookIds, coverImg ?? null);
+      const ghost = this.createMultiBookGhost(bookIds, coverImg ?? null, coverW, coverH);
       document.body.appendChild(ghost);
       const stackCount = Math.min(bookIds.length, 3);
-      const ghostW = this.GHOST_COVER_W + (stackCount - 1) * this.GHOST_STACK_STEP;
-      const ghostH = this.GHOST_COVER_H + (stackCount - 1) * this.GHOST_STACK_STEP;
+      const ghostW = coverW + (stackCount - 1) * this.GHOST_STACK_STEP;
+      const ghostH = coverH + (stackCount - 1) * this.GHOST_STACK_STEP;
       event.dataTransfer.setDragImage(ghost, ghostW / 2, ghostH / 2);
       document.addEventListener('dragend', () => ghost.parentNode?.removeChild(ghost), {once: true});
     }
   }
 
-  private createMultiBookGhost(bookIds: number[], topCoverImg: HTMLImageElement | null): HTMLElement {
+  private createMultiBookGhost(bookIds: number[], topCoverImg: HTMLImageElement | null, coverW: number, coverH: number): HTMLElement {
     const stackCount = Math.min(bookIds.length, 3);
-    const totalW = this.GHOST_COVER_W + (stackCount - 1) * this.GHOST_STACK_STEP;
-    const totalH = this.GHOST_COVER_H + (stackCount - 1) * this.GHOST_STACK_STEP;
+    const totalW = coverW + (stackCount - 1) * this.GHOST_STACK_STEP;
+    const totalH = coverH + (stackCount - 1) * this.GHOST_STACK_STEP;
 
     const container = document.createElement('div');
     container.style.position = 'fixed';
@@ -345,8 +345,8 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
         img.src = this.urlHelper.getThumbnailUrl(bookIds[i]);
       }
       img.style.position = 'absolute';
-      img.style.width = `${this.GHOST_COVER_W}px`;
-      img.style.height = `${this.GHOST_COVER_H}px`;
+      img.style.width = `${coverW}px`;
+      img.style.height = `${coverH}px`;
       img.style.objectFit = 'cover';
       img.style.borderRadius = '4px';
       img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.4)';
