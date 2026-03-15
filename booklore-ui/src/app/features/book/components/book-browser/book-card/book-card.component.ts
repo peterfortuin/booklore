@@ -296,7 +296,7 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
     }
     const selected = this.bookSelectionService.selectedBooks;
     const bookIds = this.isSelected && selected.size > 1
-      ? Array.from(selected)
+      ? [this.book.id, ...Array.from(selected).filter(id => id !== this.book.id)]
       : [this.book.id];
     event.dataTransfer?.setData('bookIds', JSON.stringify(bookIds));
     this.bookDragService.startDrag(bookIds);
@@ -377,7 +377,7 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
     }
     const selected = this.bookSelectionService.selectedBooks;
     const bookIds = this.isSelected && selected.size > 1
-      ? Array.from(selected)
+      ? [this.book.id, ...Array.from(selected).filter(id => id !== this.book.id)]
       : [this.book.id];
     this.bookDragService.startDrag(bookIds);
   }

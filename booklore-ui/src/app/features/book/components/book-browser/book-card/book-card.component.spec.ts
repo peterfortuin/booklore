@@ -136,7 +136,7 @@ describe('BookCardComponent – onDragStart', () => {
     expect(event.dataTransfer!.setData).toHaveBeenCalledWith('bookIds', JSON.stringify([42]));
   });
 
-  it('should set bookIds with all selected book ids when selection has multiple books', () => {
+  it('should set bookIds with all selected book ids when selection has multiple books, with dragged book first', () => {
     bookSelectionService.setSelectedBooks(new Set([42, 7, 99]));
     component.isSelected = true;
     const event = createDragEvent([]);
@@ -145,6 +145,7 @@ describe('BookCardComponent – onDragStart', () => {
     const call = (event.dataTransfer!.setData as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(call[0]).toBe('bookIds');
     const ids: number[] = JSON.parse(call[1]);
+    expect(ids[0]).toBe(42); // dragged book (book.id=42) must be first
     expect(ids.sort((a, b) => a - b)).toEqual([7, 42, 99]);
   });
 
@@ -185,8 +186,16 @@ describe('BookCardComponent – onDragStart', () => {
     expect(event.dataTransfer!.setDragImage).toHaveBeenCalledWith(expect.any(HTMLElement), expect.any(Number), expect.any(Number));
     const ghostArg = (event.dataTransfer!.setDragImage as ReturnType<typeof vi.fn>).mock.calls[0][0] as HTMLElement;
     // Ghost should contain stacked cover images (up to 3) + badge
-    expect(ghostArg.querySelectorAll('img').length).toBe(3);
+    const imgs = ghostArg.querySelectorAll('img');
+    expect(imgs.length).toBe(3);
     expect(ghostArg.querySelector('div')).not.toBeNull();
+    // The top cover (last img drawn, i=0) should be for the dragged book (id=42)
+    // The loop draws from i=stackCount-1 down to i=0; i=0 = bookIds[0] = dragged book
+    const urlHelper = TestBed.inject(UrlHelperService);
+    expect(urlHelper.getThumbnailUrl).toHaveBeenCalledWith(42);
+    // Verify 42 is the last call (i=0, rendered on top)
+    const calls = (urlHelper.getThumbnailUrl as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls[calls.length - 1][0]).toBe(42);
   });
 });
 
