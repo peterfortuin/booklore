@@ -85,6 +85,10 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
 
   private _touchDragTarget: HTMLElement | null = null;
 
+  private readonly GHOST_COVER_W = 60;
+  private readonly GHOST_COVER_H = 90;
+  private readonly GHOST_STACK_STEP = 6;
+
   protected _progressPercentage: number | null = null;
   protected _koProgressPercentage: number | null = null;
   protected _koboProgressPercentage: number | null = null;
@@ -296,6 +300,75 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
       : [this.book.id];
     event.dataTransfer?.setData('bookIds', JSON.stringify(bookIds));
     this.bookDragService.startDrag(bookIds);
+
+    if (!event.dataTransfer) {
+      return;
+    }
+
+    if (bookIds.length === 1) {
+      const coverImg = (event.currentTarget as HTMLElement)?.querySelector<HTMLImageElement>('.book-cover');
+      if (coverImg) {
+        const w = coverImg.clientWidth || this.GHOST_COVER_W;
+        const h = coverImg.clientHeight || this.GHOST_COVER_H;
+        event.dataTransfer.setDragImage(coverImg, w / 2, h / 2);
+      }
+    } else {
+      const ghost = this.createMultiBookGhost(bookIds);
+      document.body.appendChild(ghost);
+      const stackCount = Math.min(bookIds.length, 3);
+      const ghostW = this.GHOST_COVER_W + (stackCount - 1) * this.GHOST_STACK_STEP;
+      const ghostH = this.GHOST_COVER_H + (stackCount - 1) * this.GHOST_STACK_STEP;
+      event.dataTransfer.setDragImage(ghost, ghostW / 2, ghostH / 2);
+      document.addEventListener('dragend', () => ghost.parentNode?.removeChild(ghost), {once: true});
+    }
+  }
+
+  private createMultiBookGhost(bookIds: number[]): HTMLElement {
+    const stackCount = Math.min(bookIds.length, 3);
+    const totalW = this.GHOST_COVER_W + (stackCount - 1) * this.GHOST_STACK_STEP;
+    const totalH = this.GHOST_COVER_H + (stackCount - 1) * this.GHOST_STACK_STEP;
+
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.top = '-9999px';
+    container.style.left = '-9999px';
+    container.style.width = `${totalW}px`;
+    container.style.height = `${totalH}px`;
+    container.style.pointerEvents = 'none';
+
+    for (let i = stackCount - 1; i >= 0; i--) {
+      const img = document.createElement('img');
+      img.src = this.urlHelper.getThumbnailUrl(bookIds[i]);
+      img.style.position = 'absolute';
+      img.style.width = `${this.GHOST_COVER_W}px`;
+      img.style.height = `${this.GHOST_COVER_H}px`;
+      img.style.objectFit = 'cover';
+      img.style.borderRadius = '4px';
+      img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.4)';
+      img.style.top = `${i * this.GHOST_STACK_STEP}px`;
+      img.style.left = `${i * this.GHOST_STACK_STEP}px`;
+      container.appendChild(img);
+    }
+
+    const badge = document.createElement('div');
+    badge.textContent = String(bookIds.length);
+    badge.style.position = 'absolute';
+    badge.style.bottom = '0';
+    badge.style.right = '0';
+    badge.style.background = 'var(--p-primary-color, #7c3aed)';
+    badge.style.color = 'white';
+    badge.style.borderRadius = '50%';
+    badge.style.width = '22px';
+    badge.style.height = '22px';
+    badge.style.display = 'flex';
+    badge.style.alignItems = 'center';
+    badge.style.justifyContent = 'center';
+    badge.style.fontSize = '11px';
+    badge.style.fontWeight = 'bold';
+    badge.style.boxShadow = '0 1px 3px rgba(0,0,0,0.4)';
+    container.appendChild(badge);
+
+    return container;
   }
 
   onTouchStart(event: TouchEvent): void {

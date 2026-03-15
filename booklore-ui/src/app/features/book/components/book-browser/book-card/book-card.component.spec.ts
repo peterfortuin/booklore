@@ -20,15 +20,16 @@ import {of} from 'rxjs';
 import {Book} from '../../../model/book.model';
 import {BookDragService} from '../book-drag.service';
 
-function createDragEvent(types: string[], getData: (key: string) => string = () => ''): DragEvent {
+function createDragEvent(types: string[], currentTarget?: HTMLElement): DragEvent {
   const dataMap = new Map<string, string>();
   const dt = {
     types,
     setData: vi.fn((key: string, value: string) => dataMap.set(key.toLowerCase(), value)),
     getData: vi.fn((key: string) => dataMap.get(key.toLowerCase()) ?? ''),
+    setDragImage: vi.fn(),
     effectAllowed: 'all',
   } as unknown as DataTransfer;
-  return {dataTransfer: dt, preventDefault: vi.fn()} as unknown as DragEvent;
+  return {dataTransfer: dt, preventDefault: vi.fn(), currentTarget: currentTarget ?? null} as unknown as DragEvent;
 }
 
 function createTouchEvent(clientX: number, clientY: number, type: 'touchstart' | 'touchmove' | 'touchend'): TouchEvent {
@@ -160,6 +161,32 @@ describe('BookCardComponent – onDragStart', () => {
     const event = createDragEvent([]);
     component.onDragStart(event);
     expect(mockDragService.startDrag).toHaveBeenCalledWith([42]);
+  });
+
+  it('should call setDragImage with the .book-cover img for a single-book drag', () => {
+    const coverImg = document.createElement('img');
+    coverImg.className = 'book-cover';
+    const card = document.createElement('div');
+    card.appendChild(coverImg);
+
+    component.isSelected = false;
+    const event = createDragEvent([], card);
+    component.onDragStart(event);
+
+    expect(event.dataTransfer!.setDragImage).toHaveBeenCalledWith(coverImg, expect.any(Number), expect.any(Number));
+  });
+
+  it('should call setDragImage with a stacked ghost element for a multi-book drag', () => {
+    bookSelectionService.setSelectedBooks(new Set([42, 7, 99]));
+    component.isSelected = true;
+    const event = createDragEvent([]);
+    component.onDragStart(event);
+
+    expect(event.dataTransfer!.setDragImage).toHaveBeenCalledWith(expect.any(HTMLElement), expect.any(Number), expect.any(Number));
+    const ghostArg = (event.dataTransfer!.setDragImage as ReturnType<typeof vi.fn>).mock.calls[0][0] as HTMLElement;
+    // Ghost should contain stacked cover images (up to 3) + badge
+    expect(ghostArg.querySelectorAll('img').length).toBe(3);
+    expect(ghostArg.querySelector('div')).not.toBeNull();
   });
 });
 
