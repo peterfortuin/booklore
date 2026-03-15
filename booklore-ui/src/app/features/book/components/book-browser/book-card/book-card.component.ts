@@ -324,7 +324,7 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private createMultiBookGhost(bookIds: number[], topCoverImg: HTMLImageElement | null, coverW: number, coverH: number): HTMLElement {
-    const stackCount = Math.min(bookIds.length, 3);
+    const stackCount = Math.min(bookIds.length, 5);
     const totalW = coverW + (stackCount - 1) * this.GHOST_STACK_STEP;
     const totalH = coverH + (stackCount - 1) * this.GHOST_STACK_STEP;
 
