@@ -315,7 +315,7 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
     } else {
       const ghost = this.createMultiBookGhost(bookIds, coverImg ?? null, coverW, coverH);
       document.body.appendChild(ghost);
-      const stackCount = Math.min(bookIds.length, 3);
+      const stackCount = Math.min(bookIds.length, 5);
       const ghostW = coverW + (stackCount - 1) * this.GHOST_STACK_STEP;
       const ghostH = coverH + (stackCount - 1) * this.GHOST_STACK_STEP;
       event.dataTransfer.setDragImage(ghost, ghostW / 2, ghostH / 2);
