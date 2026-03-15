@@ -305,15 +305,15 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
       return;
     }
 
+    const coverImg = (event.currentTarget as HTMLElement)?.querySelector<HTMLImageElement>('.book-cover');
     if (bookIds.length === 1) {
-      const coverImg = (event.currentTarget as HTMLElement)?.querySelector<HTMLImageElement>('.book-cover');
       if (coverImg) {
         const w = coverImg.clientWidth || this.GHOST_COVER_W;
         const h = coverImg.clientHeight || this.GHOST_COVER_H;
         event.dataTransfer.setDragImage(coverImg, w / 2, h / 2);
       }
     } else {
-      const ghost = this.createMultiBookGhost(bookIds);
+      const ghost = this.createMultiBookGhost(bookIds, coverImg ?? null);
       document.body.appendChild(ghost);
       const stackCount = Math.min(bookIds.length, 3);
       const ghostW = this.GHOST_COVER_W + (stackCount - 1) * this.GHOST_STACK_STEP;
@@ -323,7 +323,7 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
-  private createMultiBookGhost(bookIds: number[]): HTMLElement {
+  private createMultiBookGhost(bookIds: number[], topCoverImg: HTMLImageElement | null): HTMLElement {
     const stackCount = Math.min(bookIds.length, 3);
     const totalW = this.GHOST_COVER_W + (stackCount - 1) * this.GHOST_STACK_STEP;
     const totalH = this.GHOST_COVER_H + (stackCount - 1) * this.GHOST_STACK_STEP;
@@ -337,8 +337,13 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
     container.style.pointerEvents = 'none';
 
     for (let i = stackCount - 1; i >= 0; i--) {
-      const img = document.createElement('img');
-      img.src = this.urlHelper.getThumbnailUrl(bookIds[i]);
+      let img: HTMLImageElement;
+      if (i === 0 && topCoverImg) {
+        img = topCoverImg.cloneNode(true) as HTMLImageElement;
+      } else {
+        img = document.createElement('img');
+        img.src = this.urlHelper.getThumbnailUrl(bookIds[i]);
+      }
       img.style.position = 'absolute';
       img.style.width = `${this.GHOST_COVER_W}px`;
       img.style.height = `${this.GHOST_COVER_H}px`;

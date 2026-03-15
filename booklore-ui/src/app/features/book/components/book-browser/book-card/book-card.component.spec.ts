@@ -189,13 +189,31 @@ describe('BookCardComponent – onDragStart', () => {
     const imgs = ghostArg.querySelectorAll('img');
     expect(imgs.length).toBe(3);
     expect(ghostArg.querySelector('div')).not.toBeNull();
-    // The top cover (last img drawn, i=0) should be for the dragged book (id=42)
-    // The loop draws from i=stackCount-1 down to i=0; i=0 = bookIds[0] = dragged book
+    // No .book-cover element in the currentTarget, so getThumbnailUrl is used as fallback for all slots
     const urlHelper = TestBed.inject(UrlHelperService);
     expect(urlHelper.getThumbnailUrl).toHaveBeenCalledWith(42);
-    // Verify 42 is the last call (i=0, rendered on top)
+    // dragged book (id=42 at index 0) is drawn last (on top); last getThumbnailUrl call should be for 42
     const calls = (urlHelper.getThumbnailUrl as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls[calls.length - 1][0]).toBe(42);
+  });
+
+  it('should clone .book-cover img for the top slot in multi-book ghost when cover is available', () => {
+    bookSelectionService.setSelectedBooks(new Set([42, 7, 99]));
+    component.isSelected = true;
+    const coverImg = document.createElement('img');
+    coverImg.className = 'book-cover';
+    coverImg.src = 'http://example.com/cover-42.jpg';
+    const card = document.createElement('div');
+    card.appendChild(coverImg);
+    const event = createDragEvent([], card);
+    component.onDragStart(event);
+
+    // getThumbnailUrl must NOT be called with 42 (top slot uses cloned img element)
+    const urlHelper = TestBed.inject(UrlHelperService);
+    expect(urlHelper.getThumbnailUrl).not.toHaveBeenCalledWith(42);
+    // But it must still be called for the other books in the stack
+    expect(urlHelper.getThumbnailUrl).toHaveBeenCalledWith(7);
+    expect(urlHelper.getThumbnailUrl).toHaveBeenCalledWith(99);
   });
 });
 
