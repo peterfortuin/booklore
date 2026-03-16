@@ -167,11 +167,15 @@
     "dragDrop": {
       "success": {
         "summary": "Book Added to Shelf",
-        "detail": "The book was successfully added to \"{{ shelf }}\""
+        "summary_plural": "Books Added to Shelf",
+        "detail": "The book was successfully added to \"{{ shelf }}\"",
+        "detail_plural": "{{ count }} books were successfully added to \"{{ shelf }}\""
       },
       "error": {
         "summary": "Failed to Add Book",
-        "detail": "An error occurred while adding the book to the shelf."
+        "summary_plural": "Failed to Add Books",
+        "detail": "An error occurred while adding the book to the shelf.",
+        "detail_plural": "An error occurred while adding the books to the shelf."
       }
     }
   }

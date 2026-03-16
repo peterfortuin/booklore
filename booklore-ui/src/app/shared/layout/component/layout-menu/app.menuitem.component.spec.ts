@@ -146,11 +146,21 @@ describe('AppMenuitemComponent – drag-and-drop', () => {
       );
     });
 
-    it('should reload shelves and show success toast on success', () => {
+    it('should reload shelves and show success toast on success (single book)', () => {
       const event = makeDragEvent(['bookids'], JSON.stringify([5]));
       component.onDrop(event);
       expect(mockShelfService.reloadShelves).toHaveBeenCalled();
       expect(mockMessageService.add).toHaveBeenCalledWith(expect.objectContaining({severity: 'success'}));
+      expect(mockTransloco.translate).toHaveBeenCalledWith('shared.shelf.dragDrop.success.summary');
+      expect(mockTransloco.translate).toHaveBeenCalledWith('shared.shelf.dragDrop.success.detail', expect.objectContaining({shelf: 'My Shelf', count: 1}));
+    });
+
+    it('should use plural translation keys for success toast when multiple books dropped', () => {
+      const event = makeDragEvent(['bookids'], JSON.stringify([1, 2, 3]));
+      component.onDrop(event);
+      expect(mockMessageService.add).toHaveBeenCalledWith(expect.objectContaining({severity: 'success'}));
+      expect(mockTransloco.translate).toHaveBeenCalledWith('shared.shelf.dragDrop.success.summary_plural');
+      expect(mockTransloco.translate).toHaveBeenCalledWith('shared.shelf.dragDrop.success.detail_plural', expect.objectContaining({shelf: 'My Shelf', count: 3}));
     });
 
     it('should show error toast when updateBookShelves errors', () => {

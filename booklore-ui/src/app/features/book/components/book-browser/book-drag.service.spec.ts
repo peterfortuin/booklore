@@ -63,11 +63,21 @@ describe('BookDragService', () => {
     );
   });
 
-  it('should reload shelves and show success toast on drop success', () => {
+  it('should reload shelves and show success toast on drop success (single book)', () => {
     service.startDrag([5]);
     service.dropOnShelf(10, 'My Shelf');
     expect(mockShelfService.reloadShelves).toHaveBeenCalled();
     expect(mockMessageService.add).toHaveBeenCalledWith(expect.objectContaining({severity: 'success'}));
+    expect(mockTransloco.translate).toHaveBeenCalledWith('shared.shelf.dragDrop.success.summary');
+    expect(mockTransloco.translate).toHaveBeenCalledWith('shared.shelf.dragDrop.success.detail', expect.objectContaining({shelf: 'My Shelf', count: 1}));
+  });
+
+  it('should use plural translation keys when dragging multiple books', () => {
+    service.startDrag([1, 2, 3]);
+    service.dropOnShelf(10, 'My Shelf');
+    expect(mockMessageService.add).toHaveBeenCalledWith(expect.objectContaining({severity: 'success'}));
+    expect(mockTransloco.translate).toHaveBeenCalledWith('shared.shelf.dragDrop.success.summary_plural');
+    expect(mockTransloco.translate).toHaveBeenCalledWith('shared.shelf.dragDrop.success.detail_plural', expect.objectContaining({shelf: 'My Shelf', count: 3}));
   });
 
   it('should show error toast when updateBookShelves errors', () => {
