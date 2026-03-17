@@ -1,4 +1,4 @@
-import {Component, ElementRef, HostBinding, Input, OnDestroy, OnInit, ViewChild} from '@angular/core';
+import {Component, ElementRef, HostBinding, inject, Input, OnDestroy, OnInit, ViewChild} from '@angular/core';
 import {NavigationEnd, Router, RouterLink} from '@angular/router';
 import {animate, state, style, transition, trigger} from '@angular/animations';
 import {Subscription} from 'rxjs';
@@ -13,9 +13,11 @@ import {DialogLauncherService} from '../../../services/dialog-launcher.service';
 import {BookDialogHelperService} from '../../../../features/book/components/book-browser/book-dialog-helper.service';
 import {IconDisplayComponent} from '../../../components/icon-display/icon-display.component';
 import {Tooltip} from 'primeng/tooltip';
-import {MenuItem} from 'primeng/api';
+import {MenuItem, MessageService} from 'primeng/api';
 import {IconSelection} from '../../../service/icon-picker.service';
-import {TranslocoPipe} from '@jsverse/transloco';
+import {TranslocoPipe, TranslocoService} from '@jsverse/transloco';
+import {BookPatchService} from '../../../../features/book/service/book-patch.service';
+import {ShelfService} from '../../../../features/book/service/shelf.service';
 
 @Component({
   selector: '[app-menuitem]',
@@ -52,30 +54,42 @@ export class AppMenuitemComponent implements OnInit, OnDestroy {
   @Input() menuKey!: string;
   @ViewChild('linkRef') linkRef!: ElementRef<HTMLAnchorElement>;
 
+  readonly router = inject(Router);
+  private readonly menuService = inject(MenuService);
+  private readonly userService = inject(UserService);
+  private readonly dialogLauncher = inject(DialogLauncherService);
+  private readonly bookDialogHelperService = inject(BookDialogHelperService);
+  private readonly bookPatchService = inject(BookPatchService);
+  private readonly messageService = inject(MessageService);
+  private readonly shelfService = inject(ShelfService);
+  private readonly translocoService = inject(TranslocoService);
+
   hovered = false;
   active = false;
   key: string = "";
   canManipulateLibrary: boolean = false;
   admin: boolean = false;
   expandedItems = new Set<string>();
+  isDragOver = false;
 
   get isRouteActive(): boolean {
     if (!this.item?.routerLink?.[0]) return false;
     return this.router.url.split('?')[0] === this.item.routerLink[0];
   }
 
-  private userStateSubscription: Subscription;
-  menuSourceSubscription: Subscription;
-  menuResetSubscription: Subscription;
-  private routerSubscription: Subscription;
+  private userStateSubscription: Subscription | undefined;
+  menuSourceSubscription: Subscription | undefined;
+  menuResetSubscription: Subscription | undefined;
+  private routerSubscription: Subscription | undefined;
 
-  constructor(
-    public router: Router,
-    private menuService: MenuService,
-    private userService: UserService,
-    private dialogLauncher: DialogLauncherService,
-    private bookDialogHelperService: BookDialogHelperService
-  ) {
+  ngOnInit() {
+    const rootKey = this.menuKey ? this.menuKey + '-' : '';
+    this.key = this.parentKey ? this.parentKey + '-' + this.index : rootKey + String(this.index);
+    this.expandedItems.add(this.key);
+    if (this.item.routerLink) {
+      this.updateActiveStateFromRoute();
+    }
+
     this.userStateSubscription = this.userService.userState$.subscribe(userState => {
       if (userState?.user) {
         this.canManipulateLibrary = userState.user.permissions.canManageLibrary;
@@ -105,15 +119,6 @@ export class AppMenuitemComponent implements OnInit, OnDestroy {
           this.updateActiveStateFromRoute();
         }
       });
-  }
-
-  ngOnInit() {
-    const rootKey = this.menuKey ? this.menuKey + '-' : '';
-    this.key = this.parentKey ? this.parentKey + '-' + this.index : rootKey + String(this.index);
-    this.expandedItems.add(this.key);
-    if (this.item.routerLink) {
-      this.updateActiveStateFromRoute();
-    }
   }
 
   ngOnDestroy() {
@@ -194,6 +199,59 @@ export class AppMenuitemComponent implements OnInit, OnDestroy {
       type: this.item.iconType || 'PRIME_NG',
       value: this.item.icon
     };
+  }
+
+  onDragOver(event: DragEvent): void {
+    if (this.item?.shelfId != null && event.dataTransfer?.types.includes('bookids')) {
+      event.preventDefault();
+      this.isDragOver = true;
+    }
+  }
+
+  onDragLeave(event: DragEvent): void {
+    this.isDragOver = false;
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+
+    this.isDragOver = false;
+
+    if (this.item?.shelfId == null) {
+      return;
+    }
+
+    const raw = event.dataTransfer?.getData('bookIds');
+    const bookIds: number[] = raw ? JSON.parse(raw) : [];
+
+    if (bookIds.length === 0) {
+      return;
+    }
+
+    this.bookPatchService.updateBookShelves(
+      new Set(bookIds),
+      new Set([this.item.shelfId]),
+      new Set()
+    ).subscribe({
+      next: () => {
+        this.shelfService.reloadShelves();
+        const count = bookIds.length;
+        const plural = count > 1;
+        this.messageService.add({
+          severity: 'success',
+          summary: this.translocoService.translate(plural ? 'shared.shelf.dragDrop.success.summary_plural' : 'shared.shelf.dragDrop.success.summary'),
+          detail: this.translocoService.translate(plural ? 'shared.shelf.dragDrop.success.detail_plural' : 'shared.shelf.dragDrop.success.detail', {shelf: this.item.label, count}),
+        });
+      },
+      error: () => {
+        const plural = bookIds.length > 1;
+        this.messageService.add({
+          severity: 'error',
+          summary: this.translocoService.translate(plural ? 'shared.shelf.dragDrop.error.summary_plural' : 'shared.shelf.dragDrop.error.summary'),
+          detail: this.translocoService.translate(plural ? 'shared.shelf.dragDrop.error.detail_plural' : 'shared.shelf.dragDrop.error.detail'),
+        });
+      }
+    });
   }
 
 }

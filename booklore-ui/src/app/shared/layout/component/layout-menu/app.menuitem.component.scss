@@ -52,6 +52,12 @@
     background-color: var(--p-surface-800);
     border-radius: 8px;
   }
+
+  &.drag-over {
+    background-color: color-mix(in srgb, var(--p-primary-400), transparent 75%);
+    border: 1px dashed var(--p-primary-400);
+    border-radius: 8px;
+  }
 }
 
 .menu-item-container.active-route-container {

@@ -29,6 +29,8 @@ import {BookNavigationService} from '../../../service/book-navigation.service';
 import {BookCardOverlayPreferenceService} from '../book-card-overlay-preference.service';
 import {AppSettingsService} from '../../../../../shared/service/app-settings.service';
 import {TranslocoPipe, TranslocoService} from '@jsverse/transloco';
+import {BookSelectionService} from '../book-selection.service';
+import {BookDragService} from '../book-drag.service';
 
 @Component({
   selector: 'app-book-card',
@@ -78,6 +80,15 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
   private cdr = inject(ChangeDetectorRef);
   private appSettingsService = inject(AppSettingsService);
   private readonly t = inject(TranslocoService);
+  private bookSelectionService = inject(BookSelectionService);
+  private bookDragService = inject(BookDragService);
+
+  private _touchDragTarget: HTMLElement | null = null;
+  private _touchGhost: HTMLElement | null = null;
+
+  private readonly GHOST_COVER_W = 60;
+  private readonly GHOST_COVER_H = 90;
+  private readonly GHOST_STACK_STEP = 6;
 
   protected _progressPercentage: number | null = null;
   protected _koProgressPercentage: number | null = null;
@@ -278,6 +289,201 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
   onImageLoad(): void {
     this.isImageLoaded = true;
     this.cdr.markForCheck();
+  }
+
+  onDragStart(event: DragEvent): void {
+    if (this.book?.id == null) {
+      return;
+    }
+    const selected = this.bookSelectionService.selectedBooks;
+    const bookIds = this.isSelected && selected.size > 1
+      ? [this.book.id, ...Array.from(selected).filter(id => id !== this.book.id)]
+      : [this.book.id];
+    event.dataTransfer?.setData('bookIds', JSON.stringify(bookIds));
+    this.bookDragService.startDrag(bookIds);
+
+    if (!event.dataTransfer) {
+      return;
+    }
+
+    const coverImg = (event.currentTarget as HTMLElement)?.querySelector<HTMLImageElement>('.book-cover');
+    const coverW = coverImg?.clientWidth || this.GHOST_COVER_W;
+    const coverH = coverImg?.clientHeight || this.GHOST_COVER_H;
+    if (bookIds.length === 1) {
+      if (coverImg) {
+        event.dataTransfer.setDragImage(coverImg, coverW / 2, coverH / 2);
+      }
+    } else {
+      const ghost = this.createMultiBookGhost(bookIds, coverImg ?? null, coverW, coverH);
+      document.body.appendChild(ghost);
+      const stackCount = Math.min(bookIds.length, 5);
+      const ghostW = coverW + (stackCount - 1) * this.GHOST_STACK_STEP;
+      const ghostH = coverH + (stackCount - 1) * this.GHOST_STACK_STEP;
+      event.dataTransfer.setDragImage(ghost, ghostW / 2, ghostH / 2);
+      document.addEventListener('dragend', () => ghost.parentNode?.removeChild(ghost), {once: true});
+    }
+  }
+
+  private createMultiBookGhost(bookIds: number[], topCoverImg: HTMLImageElement | null, coverW: number, coverH: number): HTMLElement {
+    const stackCount = Math.min(bookIds.length, 5);
+    const totalW = coverW + (stackCount - 1) * this.GHOST_STACK_STEP;
+    const totalH = coverH + (stackCount - 1) * this.GHOST_STACK_STEP;
+
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.top = '-9999px';
+    container.style.left = '-9999px';
+    container.style.width = `${totalW}px`;
+    container.style.height = `${totalH}px`;
+    container.style.pointerEvents = 'none';
+
+    for (let i = stackCount - 1; i >= 0; i--) {
+      let img: HTMLImageElement;
+      if (i === 0 && topCoverImg) {
+        img = topCoverImg.cloneNode(true) as HTMLImageElement;
+      } else {
+        img = document.createElement('img');
+        img.src = this.urlHelper.getThumbnailUrl(bookIds[i]);
+      }
+      img.style.position = 'absolute';
+      img.style.width = `${coverW}px`;
+      img.style.height = `${coverH}px`;
+      img.style.objectFit = 'cover';
+      img.style.borderRadius = '4px';
+      img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.4)';
+      img.style.top = `${i * this.GHOST_STACK_STEP}px`;
+      img.style.left = `${i * this.GHOST_STACK_STEP}px`;
+      container.appendChild(img);
+    }
+
+    const badge = document.createElement('div');
+    badge.textContent = String(bookIds.length);
+    badge.style.position = 'absolute';
+    badge.style.bottom = '0';
+    badge.style.right = '0';
+    badge.style.background = 'var(--p-primary-color, #7c3aed)';
+    badge.style.color = 'white';
+    badge.style.borderRadius = '50%';
+    badge.style.width = '22px';
+    badge.style.height = '22px';
+    badge.style.display = 'flex';
+    badge.style.alignItems = 'center';
+    badge.style.justifyContent = 'center';
+    badge.style.fontSize = '11px';
+    badge.style.fontWeight = 'bold';
+    badge.style.boxShadow = '0 1px 3px rgba(0,0,0,0.4)';
+    container.appendChild(badge);
+
+    return container;
+  }
+
+  private createTouchGhost(bookIds: number[], topCoverImg: HTMLImageElement | null, coverW: number, coverH: number): HTMLElement {
+    let ghost: HTMLElement;
+    if (bookIds.length === 1) {
+      ghost = document.createElement('div');
+      ghost.style.width = `${coverW}px`;
+      ghost.style.height = `${coverH}px`;
+      let img: HTMLImageElement;
+      if (topCoverImg) {
+        img = topCoverImg.cloneNode(true) as HTMLImageElement;
+      } else {
+        img = document.createElement('img');
+        img.src = this.urlHelper.getThumbnailUrl(bookIds[0]);
+      }
+      img.style.width = `${coverW}px`;
+      img.style.height = `${coverH}px`;
+      img.style.objectFit = 'cover';
+      img.style.borderRadius = '4px';
+      img.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+      img.style.display = 'block';
+      ghost.appendChild(img);
+    } else {
+      ghost = this.createMultiBookGhost(bookIds, topCoverImg, coverW, coverH);
+    }
+    ghost.style.position = 'fixed';
+    ghost.style.zIndex = '9999';
+    ghost.style.opacity = '0.85';
+    ghost.style.pointerEvents = 'none';
+    return ghost;
+  }
+
+  private positionTouchGhost(ghost: HTMLElement, clientX: number, clientY: number): void {
+    const ghostW = parseFloat(ghost.style.width) || this.GHOST_COVER_W;
+    const ghostH = parseFloat(ghost.style.height) || this.GHOST_COVER_H;
+    ghost.style.left = `${clientX - ghostW / 2}px`;
+    ghost.style.top = `${clientY - ghostH - 20}px`;
+  }
+
+  onTouchStart(event: TouchEvent): void {
+    if (this.book?.id == null) {
+      return;
+    }
+    const selected = this.bookSelectionService.selectedBooks;
+    const bookIds = this.isSelected && selected.size > 1
+      ? [this.book.id, ...Array.from(selected).filter(id => id !== this.book.id)]
+      : [this.book.id];
+    this.bookDragService.startDrag(bookIds);
+
+    const coverImg = (event.currentTarget as HTMLElement)?.querySelector<HTMLImageElement>('.book-cover');
+    const coverW = coverImg?.clientWidth || this.GHOST_COVER_W;
+    const coverH = coverImg?.clientHeight || this.GHOST_COVER_H;
+    const ghost = this.createTouchGhost(bookIds, coverImg ?? null, coverW, coverH);
+    const touch = event.touches[0];
+    this.positionTouchGhost(ghost, touch.clientX, touch.clientY);
+    document.body.appendChild(ghost);
+    this._touchGhost = ghost;
+  }
+
+  onTouchMove(event: TouchEvent): void {
+    if (this.bookDragService.draggedBookIds.length === 0) {
+      return;
+    }
+    event.preventDefault();
+
+    const touch = event.touches[0];
+
+    if (this._touchGhost) {
+      this.positionTouchGhost(this._touchGhost, touch.clientX, touch.clientY);
+    }
+
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const container = target?.closest('.menu-item-container[data-shelf-id]') as HTMLElement | null;
+
+    if (container !== this._touchDragTarget) {
+      this._touchDragTarget?.classList.remove('drag-over');
+      this._touchDragTarget = container;
+      container?.classList.add('drag-over');
+    }
+  }
+
+  onTouchEnd(event: TouchEvent): void {
+    if (this._touchGhost) {
+      this._touchGhost.parentNode?.removeChild(this._touchGhost);
+      this._touchGhost = null;
+    }
+
+    if (this.bookDragService.draggedBookIds.length === 0) {
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const container = target?.closest('.menu-item-container[data-shelf-id]') as HTMLElement | null;
+
+    this._touchDragTarget?.classList.remove('drag-over');
+    this._touchDragTarget = null;
+
+    if (container) {
+      const shelfId = parseInt(container.dataset['shelfId'] ?? '', 10);
+      if (isNaN(shelfId)) {
+        this.bookDragService.endDrag();
+        return;
+      }
+      const shelfLabel = container.dataset['shelfLabel'] ?? '';
+      this.bookDragService.dropOnShelf(shelfId, shelfLabel);
+    } else {
+      this.bookDragService.endDrag();
+    }
   }
 
   readBook(book: Book): void {

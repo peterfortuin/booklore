@@ -1,5 +1,10 @@
 <div class="book-card"
      [class.selected]="isSelected"
+     draggable="true"
+     (dragstart)="onDragStart($event)"
+     (touchstart)="onTouchStart($event)"
+     (touchmove)="onTouchMove($event)"
+     (touchend)="onTouchEnd($event)"
      (click)="onCardClick($event)">
 
   <div class="cover-container" [ngClass]="{ 'center-info-btn': _isSeriesViewActive || !hasDigitalFile(), 'loaded': isImageLoaded, 'audiobook-cover': _isAudiobook, 'square-library-cover': useSquareCovers }">
