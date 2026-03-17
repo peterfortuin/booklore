@@ -145,7 +145,7 @@ describe('BookCardComponent – onDragStart', () => {
     const call = (event.dataTransfer!.setData as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(call[0]).toBe('bookIds');
     const ids: number[] = JSON.parse(call[1]);
-    expect(ids[0]).toBe(42); // dragged book (book.id=42) must be first
+    expect(ids[0]).toBe(42);
     expect(ids.sort((a, b) => a - b)).toEqual([7, 42, 99]);
   });
 
@@ -185,14 +185,11 @@ describe('BookCardComponent – onDragStart', () => {
 
     expect(event.dataTransfer!.setDragImage).toHaveBeenCalledWith(expect.any(HTMLElement), expect.any(Number), expect.any(Number));
     const ghostArg = (event.dataTransfer!.setDragImage as ReturnType<typeof vi.fn>).mock.calls[0][0] as HTMLElement;
-    // Ghost should contain stacked cover images (up to 3) + badge
     const imgs = ghostArg.querySelectorAll('img');
     expect(imgs.length).toBe(3);
     expect(ghostArg.querySelector('div')).not.toBeNull();
-    // No .book-cover element in the currentTarget, so getThumbnailUrl is used as fallback for all slots
     const urlHelper = TestBed.inject(UrlHelperService);
     expect(urlHelper.getThumbnailUrl).toHaveBeenCalledWith(42);
-    // dragged book (id=42 at index 0) is drawn last (on top); last getThumbnailUrl call should be for 42
     const calls = (urlHelper.getThumbnailUrl as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls[calls.length - 1][0]).toBe(42);
   });
@@ -208,10 +205,8 @@ describe('BookCardComponent – onDragStart', () => {
     const event = createDragEvent([], card);
     component.onDragStart(event);
 
-    // getThumbnailUrl must NOT be called with 42 (top slot uses cloned img element)
     const urlHelper = TestBed.inject(UrlHelperService);
     expect(urlHelper.getThumbnailUrl).not.toHaveBeenCalledWith(42);
-    // But it must still be called for the other books in the stack
     expect(urlHelper.getThumbnailUrl).toHaveBeenCalledWith(7);
     expect(urlHelper.getThumbnailUrl).toHaveBeenCalledWith(99);
   });
@@ -269,7 +264,6 @@ describe('BookCardComponent – touch drag-and-drop', () => {
     const ghost = (component as any)._touchGhost as HTMLElement;
     expect(ghost).not.toBeNull();
     expect(document.body.contains(ghost)).toBe(true);
-    // cleanup
     ghost.parentNode?.removeChild(ghost);
   });
 
@@ -278,7 +272,6 @@ describe('BookCardComponent – touch drag-and-drop', () => {
     component.onTouchStart(createTouchEvent(100, 200, 'touchstart'));
     const ghost = (component as any)._touchGhost as HTMLElement;
     expect(parseFloat(ghost.style.top)).toBeLessThan(200);
-    // cleanup
     ghost.parentNode?.removeChild(ghost);
   });
 
@@ -368,7 +361,6 @@ describe('BookCardComponent – touch drag-and-drop', () => {
     container.dataset['shelfLabel'] = 'My Shelf';
     mockElementFromPoint(container);
 
-    // simulate a previous touch-move target
     (component as any)._touchDragTarget = container;
 
     component.onTouchEnd(createTouchEvent(100, 100, 'touchend'));
