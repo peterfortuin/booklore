@@ -263,6 +263,25 @@ describe('BookCardComponent – touch drag-and-drop', () => {
     expect(ids.sort((a, b) => a - b)).toEqual([7, 42, 99]);
   });
 
+  it('should create a touch ghost and append it to document.body on touchstart', () => {
+    component.isSelected = false;
+    component.onTouchStart(createTouchEvent(100, 200, 'touchstart'));
+    const ghost = (component as any)._touchGhost as HTMLElement;
+    expect(ghost).not.toBeNull();
+    expect(document.body.contains(ghost)).toBe(true);
+    // cleanup
+    ghost.parentNode?.removeChild(ghost);
+  });
+
+  it('should position the touch ghost above the finger on touchstart', () => {
+    component.isSelected = false;
+    component.onTouchStart(createTouchEvent(100, 200, 'touchstart'));
+    const ghost = (component as any)._touchGhost as HTMLElement;
+    expect(parseFloat(ghost.style.top)).toBeLessThan(200);
+    // cleanup
+    ghost.parentNode?.removeChild(ghost);
+  });
+
   // ─── onTouchMove ─────────────────────────────────────────────────────────
 
   it('should do nothing on touchmove when no drag is active', () => {
@@ -293,6 +312,20 @@ describe('BookCardComponent – touch drag-and-drop', () => {
 
     component.onTouchMove(createTouchEvent(100, 100, 'touchmove'));
     expect(container.classList.contains('drag-over')).toBe(true);
+  });
+
+  it('should move the touch ghost to follow the finger on touchmove', () => {
+    mockDragService.draggedBookIds = [42];
+    const ghost = document.createElement('div');
+    ghost.style.width = '60px';
+    ghost.style.height = '90px';
+    ghost.style.position = 'fixed';
+    (component as any)._touchGhost = ghost;
+    mockElementFromPoint(null);
+
+    component.onTouchMove(createTouchEvent(150, 300, 'touchmove'));
+    expect(ghost.style.left).toBe(`${150 - 60 / 2}px`);
+    expect(ghost.style.top).toBe(`${300 - 90 - 20}px`);
   });
 
   // ─── onTouchEnd ──────────────────────────────────────────────────────────
@@ -340,6 +373,29 @@ describe('BookCardComponent – touch drag-and-drop', () => {
 
     component.onTouchEnd(createTouchEvent(100, 100, 'touchend'));
     expect(container.classList.contains('drag-over')).toBe(false);
+  });
+
+  it('should remove the touch ghost from the DOM on touchend', () => {
+    mockDragService.draggedBookIds = [42];
+    const ghost = document.createElement('div');
+    document.body.appendChild(ghost);
+    (component as any)._touchGhost = ghost;
+    mockElementFromPoint(null);
+
+    component.onTouchEnd(createTouchEvent(0, 0, 'touchend'));
+    expect(document.body.contains(ghost)).toBe(false);
+    expect((component as any)._touchGhost).toBeNull();
+  });
+
+  it('should remove the touch ghost even when no drag is active on touchend', () => {
+    mockDragService.draggedBookIds = [];
+    const ghost = document.createElement('div');
+    document.body.appendChild(ghost);
+    (component as any)._touchGhost = ghost;
+
+    component.onTouchEnd(createTouchEvent(0, 0, 'touchend'));
+    expect(document.body.contains(ghost)).toBe(false);
+    expect((component as any)._touchGhost).toBeNull();
   });
 });
 

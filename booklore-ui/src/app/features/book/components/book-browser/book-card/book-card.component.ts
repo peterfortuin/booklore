@@ -84,6 +84,7 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
   private bookDragService = inject(BookDragService);
 
   private _touchDragTarget: HTMLElement | null = null;
+  private _touchGhost: HTMLElement | null = null;
 
   private readonly GHOST_COVER_W = 60;
   private readonly GHOST_COVER_H = 90;
@@ -376,6 +377,43 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
     return container;
   }
 
+  private createTouchGhost(bookIds: number[], topCoverImg: HTMLImageElement | null, coverW: number, coverH: number): HTMLElement {
+    let ghost: HTMLElement;
+    if (bookIds.length === 1) {
+      ghost = document.createElement('div');
+      ghost.style.width = `${coverW}px`;
+      ghost.style.height = `${coverH}px`;
+      let img: HTMLImageElement;
+      if (topCoverImg) {
+        img = topCoverImg.cloneNode(true) as HTMLImageElement;
+      } else {
+        img = document.createElement('img');
+        img.src = this.urlHelper.getThumbnailUrl(bookIds[0]);
+      }
+      img.style.width = `${coverW}px`;
+      img.style.height = `${coverH}px`;
+      img.style.objectFit = 'cover';
+      img.style.borderRadius = '4px';
+      img.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+      img.style.display = 'block';
+      ghost.appendChild(img);
+    } else {
+      ghost = this.createMultiBookGhost(bookIds, topCoverImg, coverW, coverH);
+    }
+    ghost.style.position = 'fixed';
+    ghost.style.zIndex = '9999';
+    ghost.style.opacity = '0.85';
+    ghost.style.pointerEvents = 'none';
+    return ghost;
+  }
+
+  private positionTouchGhost(ghost: HTMLElement, clientX: number, clientY: number): void {
+    const ghostW = parseFloat(ghost.style.width) || this.GHOST_COVER_W;
+    const ghostH = parseFloat(ghost.style.height) || this.GHOST_COVER_H;
+    ghost.style.left = `${clientX - ghostW / 2}px`;
+    ghost.style.top = `${clientY - ghostH - 20}px`;
+  }
+
   onTouchStart(event: TouchEvent): void {
     if (this.book?.id == null) {
       return;
@@ -385,6 +423,15 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
       ? [this.book.id, ...Array.from(selected).filter(id => id !== this.book.id)]
       : [this.book.id];
     this.bookDragService.startDrag(bookIds);
+
+    const coverImg = (event.currentTarget as HTMLElement)?.querySelector<HTMLImageElement>('.book-cover');
+    const coverW = coverImg?.clientWidth || this.GHOST_COVER_W;
+    const coverH = coverImg?.clientHeight || this.GHOST_COVER_H;
+    const ghost = this.createTouchGhost(bookIds, coverImg ?? null, coverW, coverH);
+    const touch = event.touches[0];
+    this.positionTouchGhost(ghost, touch.clientX, touch.clientY);
+    document.body.appendChild(ghost);
+    this._touchGhost = ghost;
   }
 
   onTouchMove(event: TouchEvent): void {
@@ -394,6 +441,11 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
     event.preventDefault();
 
     const touch = event.touches[0];
+
+    if (this._touchGhost) {
+      this.positionTouchGhost(this._touchGhost, touch.clientX, touch.clientY);
+    }
+
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
     const container = target?.closest('.menu-item-container[data-shelf-id]') as HTMLElement | null;
 
@@ -405,6 +457,11 @@ export class BookCardComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   onTouchEnd(event: TouchEvent): void {
+    if (this._touchGhost) {
+      this._touchGhost.parentNode?.removeChild(this._touchGhost);
+      this._touchGhost = null;
+    }
+
     if (this.bookDragService.draggedBookIds.length === 0) {
       return;
     }
